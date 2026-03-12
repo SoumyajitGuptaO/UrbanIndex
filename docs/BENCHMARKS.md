@@ -59,9 +59,9 @@ Benchmark results using real OpenStreetMap data from multiple cities.
 ### Disk I/O Optimization
 | Query Size | Pages | Seeks | Seek Ratio | Status |
 |------------|-------|-------|------------|--------|
-| Small (1%) | 7 | 2 | 0.29 | ✅ EXCELLENT |
-| Medium (5%) | 14 | 6 | 0.43 | ✅ GOOD |
-| Large (25%) | 23 | 12 | 0.52 | ✅ OK |
+| Small (1%) | 7 | 2 | 0.29 | EXCELLENT |
+| Medium (5%) | 14 | 6 | 0.43 | GOOD |
+| Large (25%) | 23 | 12 | 0.52 | OK |
 
 ### K-Nearest Neighbor
 - Query: 10 nearest features to center point
@@ -103,9 +103,9 @@ Benchmark results using real OpenStreetMap data from multiple cities.
 ### Disk I/O Optimization
 | Query Size | Pages | Seeks | Seek Ratio | Status |
 |------------|-------|-------|------------|--------|
-| Small (1%) | 3 | 2 | 0.67 | ⚠️ OK |
-| Medium (5%) | 4 | 2 | 0.50 | ✅ OK |
-| Large (25%) | 18 | 8 | 0.44 | ✅ GOOD |
+| Small (1%) | 3 | 2 | 0.67 | OK |
+| Medium (5%) | 4 | 2 | 0.50 | OK |
+| Large (25%) | 18 | 8 | 0.44 | GOOD |
 
 ### K-Nearest Neighbor
 - Query: 10 nearest features to center point
@@ -147,9 +147,9 @@ Benchmark results using real OpenStreetMap data from multiple cities.
 ### Disk I/O Optimization
 | Query Size | Pages | Seeks | Seek Ratio | Status |
 |------------|-------|-------|------------|--------|
-| Small (1%) | 3 | 1 | 0.33 | ✅ GOOD |
-| Medium (5%) | 4 | 2 | 0.50 | ✅ OK |
-| Large (25%) | 23 | 12 | 0.52 | ✅ OK |
+| Small (1%) | 3 | 1 | 0.33 | GOOD |
+| Medium (5%) | 4 | 2 | 0.50 | OK |
+| Large (25%) | 23 | 12 | 0.52 | OK |
 
 ### K-Nearest Neighbor
 - Query: 10 nearest features to center point
@@ -165,7 +165,7 @@ Benchmark results using real OpenStreetMap data from multiple cities.
 | San Francisco | 2,324 | 53.67 ms | 43,302/sec |
 | Manhattan | 859 | 23.80 ms | 36,099/sec |
 | Kolkata | 2,781 | 75.63 ms | 36,770/sec |
-| **Average** | — | — | **38,724/sec** |
+| **Average** | - | - | **38,724/sec** |
 
 ### Query Performance (Full Extent)
 | City | Features | Query Time | Rate |
@@ -173,14 +173,14 @@ Benchmark results using real OpenStreetMap data from multiple cities.
 | San Francisco | 2,324 | 0.090 ms | 25,822/ms |
 | Manhattan | 859 | 0.021 ms | 40,905/ms |
 | Kolkata | 2,781 | 0.135 ms | 20,600/ms |
-| **Average** | — | — | **29,109/ms** |
+| **Average** | - | - | **29,109/ms** |
 
 ### Disk I/O Efficiency (Small Queries)
 | City | Seek Ratio | Status |
 |------|------------|--------|
-| San Francisco | 0.29 | ✅ EXCELLENT |
-| Manhattan | 0.67 | ⚠️ OK |
-| Kolkata | 0.33 | ✅ GOOD |
+| San Francisco | 0.29 | EXCELLENT |
+| Manhattan | 0.67 | OK |
+| Kolkata | 0.33 | GOOD |
 | **Average** | **0.43** | **GOOD** |
 
 ---
@@ -217,23 +217,24 @@ Traditional spatial indexes (R-trees) allocate pages without considering disk la
 
 ```bash
 # Build Urbis
-make clean && make release
+cmake -S . -B build
+cmake --build build
 
 # Download and test San Francisco
 ./examples/download_osm.sh san_francisco "37.788,-122.405,37.795,-122.395"
-./build/real_map_demo examples/data/san_francisco.geojson
+./bin/real_map_demo examples/data/san_francisco.geojson
 
 # Download and test Manhattan
 ./examples/download_osm.sh manhattan "40.758,-73.988,40.764,-73.978"
-./build/real_map_demo examples/data/manhattan.geojson
+./bin/real_map_demo examples/data/manhattan.geojson
 
 # Download and test Kolkata
 ./examples/download_osm.sh kolkata "22.565,88.340,22.580,88.360"
-./build/real_map_demo examples/data/kolkata.geojson
+./bin/real_map_demo examples/data/kolkata.geojson
 
 # Test your own city
 ./examples/download_osm.sh [city_name] [min_lat,min_lon,max_lat,max_lon]
-./build/real_map_demo examples/data/[city_name].geojson
+./bin/real_map_demo examples/data/[city_name].geojson
 ```
 
 ---

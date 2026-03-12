@@ -7,4 +7,4 @@ Name: urbis
 Description: Disk-aware spatial indexing library
 Version: 1.0.0
 Libs: -L${libdir} -lurbis
-Cflags: -I${includedir}/urbis
+Cflags: -I${includedir}

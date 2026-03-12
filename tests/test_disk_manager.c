@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <unistd.h>
 
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -24,6 +23,14 @@ static int tests_failed = 0;
     static void test_##name(void)
 
 #define RUN_TEST(name) run_test_##name()
+
+static void make_temp_path(char *buffer, size_t size) {
+    if (!buffer || size == 0) return;
+    char tmp[L_tmpnam];
+    tmpnam(tmp);
+    strncpy(buffer, tmp, size - 1);
+    buffer[size - 1] = '\0';
+}
 
 /* ============================================================================
  * Disk Manager Tests
@@ -90,7 +97,8 @@ TEST(disk_manager_file_create) {
     DiskManager dm;
     disk_manager_init(&dm, NULL);
     
-    const char *test_file = "/tmp/urbis_test.dat";
+    char test_file[256];
+    make_temp_path(test_file, sizeof(test_file));
     
     int err = disk_manager_create(&dm, test_file);
     assert(err == DM_OK);
@@ -108,14 +116,15 @@ TEST(disk_manager_file_create) {
     disk_manager_free(&dm);
     
     /* Clean up */
-    unlink(test_file);
+    remove(test_file);
 }
 
 TEST(disk_manager_file_open) {
     DiskManager dm;
     disk_manager_init(&dm, NULL);
     
-    const char *test_file = "/tmp/urbis_test2.dat";
+    char test_file[256];
+    make_temp_path(test_file, sizeof(test_file));
     
     /* Create file with data */
     int err = disk_manager_create(&dm, test_file);
@@ -138,7 +147,7 @@ TEST(disk_manager_file_open) {
     disk_manager_free(&dm);
     
     /* Clean up */
-    unlink(test_file);
+    remove(test_file);
 }
 
 TEST(disk_manager_query_region) {
@@ -237,4 +246,3 @@ int main(void) {
     
     return tests_failed > 0 ? 1 : 0;
 }
-

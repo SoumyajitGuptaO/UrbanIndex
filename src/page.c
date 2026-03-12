@@ -36,7 +36,7 @@ static uint64_t fnv1a_hash(const void *data, size_t len) {
  */
 static uint64_t get_timestamp(void) {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    timespec_get(&ts, TIME_UTC);
     return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
 
@@ -804,4 +804,3 @@ double page_cache_hit_rate(const PageCache *cache) {
     if (total_accesses == 0) return 0.0;
     return (double)(total_accesses - cache->count) / total_accesses;
 }
-

@@ -7,12 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
+#include <float.h>
 
-#ifdef __linux__
+#if defined(URBIS_USE_MMAP) && defined(__linux__)
 #include <sys/mman.h>
 #endif
 
@@ -152,15 +149,7 @@ static int update_allocation_tree(DiskManager *dm, Page *page) {
                          page->header.page_id, page);
 }
 
-/**
- * @brief Calculate distance between two tracks
- * Note: Reserved for future optimization passes
- */
-__attribute__((unused))
-static double track_distance(const DiskTrack *a, const DiskTrack *b) {
-    if (!a || !b) return 0.0;
-    return point_distance(&a->centroid, &b->centroid);
-}
+/* track distance helper removed; unused in current implementation */
 
 /* ============================================================================
  * Disk Manager Operations
@@ -334,7 +323,7 @@ int disk_manager_close(DiskManager *dm) {
     disk_manager_sync(dm);
     
     /* Unmap if using mmap */
-#ifdef __linux__
+#if defined(URBIS_USE_MMAP) && defined(__linux__)
     if (dm->mmap_base && dm->mmap_size > 0) {
         munmap(dm->mmap_base, dm->mmap_size);
         dm->mmap_base = NULL;
@@ -472,7 +461,7 @@ DiskTrack* disk_manager_find_best_track(DiskManager *dm, Point centroid) {
         case ALLOC_NEAREST_TRACK: {
             /* Find track with nearest centroid */
             DiskTrack *best = NULL;
-            double best_dist = __DBL_MAX__;
+            double best_dist = DBL_MAX;
             
             for (size_t i = 0; i < dm->pool.track_count; i++) {
                 DiskTrack *track = dm->pool.tracks[i];
@@ -490,7 +479,7 @@ DiskTrack* disk_manager_find_best_track(DiskManager *dm, Point centroid) {
         case ALLOC_BEST_FIT: {
             /* Find track that best contains the centroid's region */
             DiskTrack *best = NULL;
-            double best_expansion = __DBL_MAX__;
+            double best_expansion = DBL_MAX;
             
             for (size_t i = 0; i < dm->pool.track_count; i++) {
                 DiskTrack *track = dm->pool.tracks[i];
@@ -664,8 +653,10 @@ size_t disk_manager_file_size(const DiskManager *dm) {
 
 bool disk_manager_file_exists(const char *path) {
     if (!path) return false;
-    struct stat st;
-    return stat(path, &st) == 0;
+    FILE *file = fopen(path, "rb");
+    if (!file) return false;
+    fclose(file);
+    return true;
 }
 
 int disk_manager_validate(DiskManager *dm) {
@@ -712,4 +703,3 @@ void disk_manager_print_stats(const DiskManager *dm, FILE *out) {
         fprintf(out, "  Cache hit rate: %.1f%%\n", hit_rate);
     }
 }
-

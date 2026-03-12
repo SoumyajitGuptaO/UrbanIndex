@@ -119,13 +119,19 @@ func (s *UrbisServer) LoadGeoJSON(ctx context.Context, req *pb.LoadGeoJSONReques
 		return nil, err
 	}
 	
-	countBefore := idx.Count()
+	countBefore, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read count: %v", err)
+	}
 	
 	if err := idx.LoadGeoJSON(req.Path); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load GeoJSON: %v", err)
 	}
 	
-	countAfter := idx.Count()
+	countAfter, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read count: %v", err)
+	}
 	loaded := countAfter - countBefore
 	
 	return &pb.LoadResponse{
@@ -141,13 +147,19 @@ func (s *UrbisServer) LoadGeoJSONString(ctx context.Context, req *pb.LoadGeoJSON
 		return nil, err
 	}
 	
-	countBefore := idx.Count()
+	countBefore, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read count: %v", err)
+	}
 	
 	if err := idx.LoadGeoJSONString(req.Geojson); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load GeoJSON: %v", err)
 	}
 	
-	countAfter := idx.Count()
+	countAfter, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read count: %v", err)
+	}
 	loaded := countAfter - countBefore
 	
 	return &pb.LoadResponse{
@@ -163,13 +175,19 @@ func (s *UrbisServer) LoadWKT(ctx context.Context, req *pb.LoadWKTRequest) (*pb.
 		return nil, err
 	}
 	
-	countBefore := idx.Count()
+	countBefore, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read count: %v", err)
+	}
 	
 	if err := idx.LoadWKT(req.Wkt); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load WKT: %v", err)
 	}
 	
-	countAfter := idx.Count()
+	countAfter, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read count: %v", err)
+	}
 	loaded := countAfter - countBefore
 	
 	return &pb.LoadResponse{
@@ -483,7 +501,10 @@ func (s *UrbisServer) GetStats(ctx context.Context, req *pb.StatsRequest) (*pb.S
 		return nil, err
 	}
 	
-	stats := idx.GetStats()
+	stats, err := idx.GetStats()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get stats: %v", err)
+	}
 	
 	return &pb.StatsResponse{
 		Stats: &pb.Stats{
@@ -512,8 +533,13 @@ func (s *UrbisServer) GetCount(ctx context.Context, req *pb.CountRequest) (*pb.C
 		return nil, err
 	}
 	
+	count, err := idx.Count()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get count: %v", err)
+	}
+
 	return &pb.CountResponse{
-		Count: idx.Count(),
+		Count: count,
 	}, nil
 }
 
@@ -524,7 +550,10 @@ func (s *UrbisServer) GetBounds(ctx context.Context, req *pb.BoundsRequest) (*pb
 		return nil, err
 	}
 	
-	bounds := idx.Bounds()
+	bounds, err := idx.Bounds()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get bounds: %v", err)
+	}
 	
 	return &pb.BoundsResponse{
 		Bounds: &pb.MBR{
@@ -645,4 +674,3 @@ func convertToPbObjects(objs []*urbis.SpatialObject) []*pb.SpatialObject {
 	}
 	return result
 }
-

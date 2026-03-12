@@ -24,6 +24,7 @@ var (
 	ErrNotFound = errors.New("not found")
 	ErrFull     = errors.New("index full")
 	ErrInvalid  = errors.New("invalid argument")
+	ErrNotBuilt = errors.New("index not built")
 )
 
 // toError converts C error code to Go error
@@ -45,6 +46,8 @@ func toError(code C.int) error {
 		return ErrFull
 	case C.URBIS_ERR_INVALID:
 		return ErrInvalid
+	case C.URBIS_ERR_NOT_BUILT:
+		return ErrNotBuilt
 	default:
 		return errors.New("unknown error")
 	}
@@ -62,7 +65,7 @@ type Config struct {
 
 // DefaultConfig returns default configuration
 func DefaultConfig() Config {
-	cConfig := C.urbis_default_config()
+	cConfig := C.urbis_config_default()
 	return Config{
 		BlockSize:     uint64(cConfig.block_size),
 		PageCapacity:  uint64(cConfig.page_capacity),
@@ -97,9 +100,10 @@ func NewIndex(config *Config) (*Index, error) {
 		cConfig = &cConfigVal
 	}
 
-	ptr := C.urbis_create(cConfig)
-	if ptr == nil {
-		return nil, ErrAlloc
+	var ptr *C.UrbisIndex
+	status := C.urbis_index_create(cConfig, &ptr)
+	if status != C.URBIS_OK || ptr == nil {
+		return nil, toError(status)
 	}
 
 	idx := &Index{ptr: ptr}
@@ -110,7 +114,7 @@ func NewIndex(config *Config) (*Index, error) {
 // Close destroys the index and frees resources
 func (idx *Index) Close() {
 	if idx.ptr != nil {
-		C.urbis_destroy(idx.ptr)
+		C.urbis_index_destroy(idx.ptr)
 		idx.ptr = nil
 	}
 }
@@ -128,21 +132,21 @@ func Version() string {
 func (idx *Index) LoadGeoJSON(path string) error {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
-	return toError(C.urbis_load_geojson(idx.ptr, cpath))
+	return toError(C.urbis_index_load_geojson(idx.ptr, cpath, nil))
 }
 
 // LoadGeoJSONString loads data from a GeoJSON string
 func (idx *Index) LoadGeoJSONString(json string) error {
 	cjson := C.CString(json)
 	defer C.free(unsafe.Pointer(cjson))
-	return toError(C.urbis_load_geojson_string(idx.ptr, cjson))
+	return toError(C.urbis_index_load_geojson_string(idx.ptr, cjson, nil))
 }
 
 // LoadWKT loads data from a WKT string
 func (idx *Index) LoadWKT(wkt string) error {
 	cwkt := C.CString(wkt)
 	defer C.free(unsafe.Pointer(cwkt))
-	return toError(C.urbis_load_wkt(idx.ptr, cwkt))
+	return toError(C.urbis_index_load_wkt(idx.ptr, cwkt, nil))
 }
 
 // =============================================================================
@@ -183,9 +187,10 @@ type SpatialObject struct {
 
 // InsertPoint inserts a point and returns its ID
 func (idx *Index) InsertPoint(x, y float64) (uint64, error) {
-	id := C.urbis_insert_point(idx.ptr, C.double(x), C.double(y))
-	if id == 0 {
-		return 0, ErrAlloc
+	var id C.uint64_t
+	status := C.urbis_index_insert_point(idx.ptr, C.double(x), C.double(y), &id)
+	if status != C.URBIS_OK {
+		return 0, toError(status)
 	}
 	return uint64(id), nil
 }
@@ -201,9 +206,10 @@ func (idx *Index) InsertLineString(points []Point) (uint64, error) {
 		cpoints[i] = C.Point{x: C.double(p.X), y: C.double(p.Y)}
 	}
 
-	id := C.urbis_insert_linestring(idx.ptr, &cpoints[0], C.size_t(len(points)))
-	if id == 0 {
-		return 0, ErrAlloc
+	var id C.uint64_t
+	status := C.urbis_index_insert_linestring(idx.ptr, &cpoints[0], C.size_t(len(points)), &id)
+	if status != C.URBIS_OK {
+		return 0, toError(status)
 	}
 	return uint64(id), nil
 }
@@ -219,25 +225,29 @@ func (idx *Index) InsertPolygon(exterior []Point) (uint64, error) {
 		cpoints[i] = C.Point{x: C.double(p.X), y: C.double(p.Y)}
 	}
 
-	id := C.urbis_insert_polygon(idx.ptr, &cpoints[0], C.size_t(len(exterior)))
-	if id == 0 {
-		return 0, ErrAlloc
+	var id C.uint64_t
+	status := C.urbis_index_insert_polygon(idx.ptr, &cpoints[0], C.size_t(len(exterior)), &id)
+	if status != C.URBIS_OK {
+		return 0, toError(status)
 	}
 	return uint64(id), nil
 }
 
 // Remove removes an object by ID
 func (idx *Index) Remove(objectID uint64) error {
-	return toError(C.urbis_remove(idx.ptr, C.uint64_t(objectID)))
+	return toError(C.urbis_index_remove(idx.ptr, C.uint64_t(objectID)))
 }
 
 // Get retrieves an object by ID
 func (idx *Index) Get(objectID uint64) (*SpatialObject, error) {
-	cobj := C.urbis_get(idx.ptr, C.uint64_t(objectID))
-	if cobj == nil {
-		return nil, ErrNotFound
+	var cobj C.SpatialObject
+	status := C.urbis_index_get(idx.ptr, C.uint64_t(objectID), &cobj)
+	if status != C.URBIS_OK {
+		return nil, toError(status)
 	}
-	return convertSpatialObject(cobj), nil
+	obj := convertSpatialObject(&cobj)
+	C.urbis_object_free(&cobj)
+	return obj, nil
 }
 
 // convertSpatialObject converts C SpatialObject to Go
@@ -290,12 +300,12 @@ func convertSpatialObject(cobj *C.SpatialObject) *SpatialObject {
 
 // Build builds the spatial index
 func (idx *Index) Build() error {
-	return toError(C.urbis_build(idx.ptr))
+	return toError(C.urbis_index_build(idx.ptr))
 }
 
 // Optimize optimizes the index for better performance
 func (idx *Index) Optimize() error {
-	return toError(C.urbis_optimize(idx.ptr))
+	return toError(C.urbis_index_optimize(idx.ptr))
 }
 
 // =============================================================================
@@ -317,9 +327,10 @@ func (idx *Index) QueryRange(region MBR) (*ObjectList, error) {
 		max_y: C.double(region.MaxY),
 	}
 
-	result := C.urbis_query_range(idx.ptr, &cmbr)
-	if result == nil {
-		return &ObjectList{Objects: []*SpatialObject{}, Count: 0}, nil
+	var result *C.UrbisObjectList
+	status := C.urbis_index_query_range(idx.ptr, &cmbr, &result)
+	if status != C.URBIS_OK {
+		return nil, toError(status)
 	}
 	defer C.urbis_object_list_free(result)
 
@@ -328,9 +339,10 @@ func (idx *Index) QueryRange(region MBR) (*ObjectList, error) {
 
 // QueryPoint queries objects at a point
 func (idx *Index) QueryPoint(x, y float64) (*ObjectList, error) {
-	result := C.urbis_query_point(idx.ptr, C.double(x), C.double(y))
-	if result == nil {
-		return &ObjectList{Objects: []*SpatialObject{}, Count: 0}, nil
+	var result *C.UrbisObjectList
+	status := C.urbis_index_query_point(idx.ptr, C.double(x), C.double(y), &result)
+	if status != C.URBIS_OK {
+		return nil, toError(status)
 	}
 	defer C.urbis_object_list_free(result)
 
@@ -339,9 +351,10 @@ func (idx *Index) QueryPoint(x, y float64) (*ObjectList, error) {
 
 // QueryKNN queries k nearest neighbors
 func (idx *Index) QueryKNN(x, y float64, k uint32) (*ObjectList, error) {
-	result := C.urbis_query_knn(idx.ptr, C.double(x), C.double(y), C.size_t(k))
-	if result == nil {
-		return &ObjectList{Objects: []*SpatialObject{}, Count: 0}, nil
+	var result *C.UrbisObjectList
+	status := C.urbis_index_query_knn(idx.ptr, C.double(x), C.double(y), C.size_t(k), &result)
+	if status != C.URBIS_OK {
+		return nil, toError(status)
 	}
 	defer C.urbis_object_list_free(result)
 
@@ -357,9 +370,10 @@ func (idx *Index) QueryAdjacent(region MBR) (*ObjectList, error) {
 		max_y: C.double(region.MaxY),
 	}
 
-	result := C.urbis_query_adjacent(idx.ptr, &cmbr)
-	if result == nil {
-		return &ObjectList{Objects: []*SpatialObject{}, Count: 0}, nil
+	var result *C.UrbisObjectList
+	status := C.urbis_index_query_adjacent(idx.ptr, &cmbr, &result)
+	if status != C.URBIS_OK {
+		return nil, toError(status)
 	}
 	defer C.urbis_object_list_free(result)
 
@@ -379,7 +393,7 @@ func convertObjectList(clist *C.UrbisObjectList) *ObjectList {
 
 	cobjects := unsafe.Slice(clist.objects, clist.count)
 	for i := range list.Objects {
-		list.Objects[i] = convertSpatialObject(cobjects[i])
+		list.Objects[i] = convertSpatialObject(&cobjects[i])
 	}
 
 	return list
@@ -411,9 +425,10 @@ func (idx *Index) FindAdjacentPages(region MBR) (*PageList, error) {
 		max_y: C.double(region.MaxY),
 	}
 
-	result := C.urbis_find_adjacent_pages(idx.ptr, &cmbr)
-	if result == nil {
-		return &PageList{Pages: []PageInfo{}, Count: 0}, nil
+	var result *C.UrbisPageList
+	status := C.urbis_index_find_adjacent_pages(idx.ptr, &cmbr, &result)
+	if status != C.URBIS_OK {
+		return nil, toError(status)
 	}
 	defer C.urbis_page_list_free(result)
 
@@ -455,9 +470,12 @@ type Stats struct {
 }
 
 // GetStats retrieves index statistics
-func (idx *Index) GetStats() Stats {
+func (idx *Index) GetStats() (Stats, error) {
 	var cstats C.UrbisStats
-	C.urbis_get_stats(idx.ptr, &cstats)
+	status := C.urbis_index_get_stats(idx.ptr, &cstats)
+	if status != C.URBIS_OK {
+		return Stats{}, toError(status)
+	}
 
 	return Stats{
 		TotalObjects:       uint64(cstats.total_objects),
@@ -474,23 +492,32 @@ func (idx *Index) GetStats() Stats {
 			MaxX: float64(cstats.bounds.max_x),
 			MaxY: float64(cstats.bounds.max_y),
 		},
-	}
+	}, nil
 }
 
 // Count returns the number of objects in the index
-func (idx *Index) Count() uint64 {
-	return uint64(C.urbis_count(idx.ptr))
+func (idx *Index) Count() (uint64, error) {
+	var count C.size_t
+	status := C.urbis_index_count(idx.ptr, &count)
+	if status != C.URBIS_OK {
+		return 0, toError(status)
+	}
+	return uint64(count), nil
 }
 
 // Bounds returns the spatial bounds of all data
-func (idx *Index) Bounds() MBR {
-	cmbr := C.urbis_bounds(idx.ptr)
+func (idx *Index) Bounds() (MBR, error) {
+	var cmbr C.MBR
+	status := C.urbis_index_bounds(idx.ptr, &cmbr)
+	if status != C.URBIS_OK {
+		return MBR{}, toError(status)
+	}
 	return MBR{
 		MinX: float64(cmbr.min_x),
 		MinY: float64(cmbr.min_y),
 		MaxX: float64(cmbr.max_x),
 		MaxY: float64(cmbr.max_y),
-	}
+	}, nil
 }
 
 // =============================================================================
@@ -501,7 +528,7 @@ func (idx *Index) Bounds() MBR {
 func (idx *Index) Save(path string) error {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
-	return toError(C.urbis_save(idx.ptr, cpath))
+	return toError(C.urbis_index_save(idx.ptr, cpath))
 }
 
 // Load loads an index from a file
@@ -509,9 +536,10 @@ func Load(path string) (*Index, error) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 
-	ptr := C.urbis_load(cpath)
-	if ptr == nil {
-		return nil, ErrIO
+	var ptr *C.UrbisIndex
+	status := C.urbis_index_load(cpath, &ptr)
+	if status != C.URBIS_OK || ptr == nil {
+		return nil, toError(status)
 	}
 
 	idx := &Index{ptr: ptr}
@@ -521,6 +549,5 @@ func Load(path string) (*Index, error) {
 
 // Sync syncs changes to disk
 func (idx *Index) Sync() error {
-	return toError(C.urbis_sync(idx.ptr))
+	return toError(C.urbis_index_sync(idx.ptr))
 }
-

@@ -1,0 +1,38 @@
+# Build artifacts
+build/
+lib/
+bin/
+
+# Object files
+*.o
+*.obj
+*.lo
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+
+# Debug and profiling
+*.pdb
+*.dSYM/
+*.profraw
+*.profdata
+
+# Tooling
+.cache/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+api/bin/
+api/pkg/pb/*.go
+
+# Logs
+*.log
